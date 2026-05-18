@@ -1,0 +1,17 @@
+{
+  "name": "call-to-slack-automation",
+  "version": "1.0.0",
+  "description": "Recall.ai webhook → Claude summary → Slack",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@slack/web-api": "^7.0.0",
+    "axios": "^1.7.0",
+    "dotenv": "^16.4.0",
+    "express": "^4.19.0"
+  }
+}
