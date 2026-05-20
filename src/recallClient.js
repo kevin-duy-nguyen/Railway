@@ -1,6 +1,6 @@
 const axios = require("axios");
 
-const BASE_URL = "https://us-west-2.recall.ai/api/v1";
+const BASE_URL = `https://${process.env.RECALL_REGION || "us-west-2"}.recall.ai/api/v1`;
 
 function headers() {
   return {
