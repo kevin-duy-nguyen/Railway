@@ -1,4 +1,4 @@
-const { getBot, createTranscript, getTranscriptDownloadUrl, downloadTranscript } = require("./recallClient");
+const { createTranscript, getTranscriptDownloadUrl, downloadTranscript } = require("./recallClient");
 const { formatTranscript } = require("./transcriptFormatter");
 const { summarizeTranscript } = require("./claudeClient");
 const { postSummary } = require("./slackClient");
@@ -51,16 +51,6 @@ async function handleWebhook(req, res) {
       if (!transcriptText) {
         console.warn(`[webhook] Empty transcript, skipping.`);
         return;
-      }
-
-      let meetingTitle = "";
-      if (botId) {
-        try {
-          const bot = await getBot(botId);
-          meetingTitle = bot?.meeting_metadata?.title || bot?.meeting_name || bot?.metadata?.title || "";
-        } catch (e) {
-          console.warn("[webhook] Could not fetch bot for title:", e.message);
-        }
       }
 
       console.log(`[webhook] Transcript fetched (${transcriptText.length} chars), sending to Claude...`);
