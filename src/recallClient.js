@@ -22,7 +22,7 @@ async function getTranscript(botId) {
 async function createTranscript(recordingId) {
   const res = await axios.post(
     `${BASE_URL}/recording/${recordingId}/create_transcript/`,
-    { provider: { recallai_async: { language_code: "en" } } },
+    { provider: { recallai_async: { } } },
     { headers: headers() }
   );
   return res.data;
