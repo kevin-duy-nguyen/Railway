@@ -10,10 +10,8 @@ async function handleWebhook(req, res) {
 
   res.status(200).json({ received: true });
 
-  // Step 1: recording.done → trigger async transcript job
   if (eventType === "recording.done") {
     const recordingId = event?.data?.recording?.id;
-    const botId = event?.data?.bot?.id;
     if (!recordingId) {
       console.error("[webhook] recording.done missing data.recording.id");
       return;
@@ -29,17 +27,14 @@ async function handleWebhook(req, res) {
     return;
   }
 
-  // Step 2: transcript.done → fetch, summarize, post to Slack
   if (eventType === "transcript.done") {
     const transcriptId = event?.data?.transcript?.id;
-    const botId = event?.data?.bot?.id;
-    const meetingTitle = event?.data?.bot?.metadata?.meeting_name || "";
-    // rest bleibt gleich, getBot() call für Titel nicht mehr nötig
     if (!transcriptId) {
       console.error("[webhook] transcript.done missing data.transcript.id");
       return;
     }
-    console.log(`[webhook] transcript.done for transcript ${transcriptId}`);
+    const meetingTitle = event?.data?.bot?.metadata?.meeting_name || "";
+    console.log(`[webhook] transcript.done for transcript ${transcriptId}, meeting: "${meetingTitle}"`);
     try {
       const downloadUrl = await getTranscriptDownloadUrl(transcriptId);
       if (!downloadUrl) {
