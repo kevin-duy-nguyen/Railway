@@ -11,8 +11,8 @@ function getClient() {
 
 async function postSummary(channelId, meetingTitle, summary) {
   const titleLine = meetingTitle
-    ? `:memo: *Meeting Summary: ${meetingTitle}*`
-    : `:memo: *Meeting Summary*`;
+    ? `📋 MEETING SUMMARY\n*${meetingTitle}*`
+    : `📋 MEETING SUMMARY`;
 
   await getClient().chat.postMessage({
     channel: channelId,
