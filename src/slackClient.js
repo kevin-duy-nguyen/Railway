@@ -12,13 +12,13 @@ function getClient() {
 async function postSummary(channelId, meetingTitle, summary) {
   const titleLine = meetingTitle
   ? `*${meetingTitle}*`
-  : `📋 *MEETING SUMMARY*`;
+  : "";
 
-  await getClient().chat.postMessage({
-    channel: channelId,
-    text: `${titleLine}\n\n${summary}`,
-    mrkdwn: true,
-  });
+await getClient().chat.postMessage({
+  channel: channelId,
+  text: meetingTitle ? `${titleLine}\n\n${summary}` : summary,
+  mrkdwn: true,
+});
 }
 
 module.exports = { postSummary };
