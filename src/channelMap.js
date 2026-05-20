@@ -6,14 +6,17 @@
  * Edit this list to add your own keyword → channel mappings.
  */
 const CHANNEL_MAP = [
-  { keyword: "standup",   channelId: process.env.SLACK_CHANNEL_STANDUP   || process.env.SLACK_CHANNEL_ID },
-  { keyword: "sprint",    channelId: process.env.SLACK_CHANNEL_SPRINT     || process.env.SLACK_CHANNEL_ID },
-  { keyword: "design",    channelId: process.env.SLACK_CHANNEL_DESIGN     || process.env.SLACK_CHANNEL_ID },
-  { keyword: "sales",     channelId: process.env.SLACK_CHANNEL_SALES      || process.env.SLACK_CHANNEL_ID },
-  { keyword: "marketing", channelId: process.env.SLACK_CHANNEL_MARKETING  || process.env.SLACK_CHANNEL_ID },
-  { keyword: "eng",       channelId: process.env.SLACK_CHANNEL_ENG        || process.env.SLACK_CHANNEL_ID },
-  { keyword: "product",   channelId: process.env.SLACK_CHANNEL_PRODUCT    || process.env.SLACK_CHANNEL_ID },
-  { keyword: "onboarding",channelId: process.env.SLACK_CHANNEL_ONBOARDING || process.env.SLACK_CHANNEL_ID },
+  { keyword: "P1 - Brand and Design Systems", channelId: process.env.SLACK_CHANNEL_P1 },
+  { keyword: "P2 - Product and Packaging", channelId: process.env.SLACK_CHANNEL_P2 },
+  { keyword: "P3 - Digital Store & Tech Stack", channelId: process.env.SLACK_CHANNEL_P3 },
+  { keyword: "P4 - Data Analytics", channelId: process.env.SLACK_CHANNEL_P4 },
+  { keyword: "P5 - Email communication", channelId: process.env.SLACK_CHANNEL_P5 },
+  { keyword: "P6 - Content, Social & Audience", channelId: process.env.SLACK_CHANNEL_P6 },
+  { keyword: "P8 - Paid Media", channelId: process.env.SLACK_CHANNEL_P8 },
+  { keyword: "P12 - AI Automations", channelId: process.env.SLACK_CHANNEL_P12 },
+  { keyword: "End of Week Update", channelId: process.env.SLACK_CHANNEL_EOW },
+  { keyword: "Check-In Call", channelId: process.env.SLACK_CHANNEL_CHECK_IN },
+  // usw
 ];
 
 function resolveChannel(meetingTitle = "") {
