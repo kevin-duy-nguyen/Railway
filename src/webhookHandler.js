@@ -33,6 +33,8 @@ async function handleWebhook(req, res) {
   if (eventType === "transcript.done") {
     const transcriptId = event?.data?.transcript?.id;
     const botId = event?.data?.bot?.id;
+    const meetingTitle = event?.data?.bot?.metadata?.meeting_name || "";
+    // rest bleibt gleich, getBot() call für Titel nicht mehr nötig
     if (!transcriptId) {
       console.error("[webhook] transcript.done missing data.transcript.id");
       return;
