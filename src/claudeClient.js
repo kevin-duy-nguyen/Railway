@@ -2,25 +2,41 @@ const Anthropic = require("@anthropic-ai/sdk");
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const SYSTEM_PROMPT = `You are a meeting summarizer. Structure the provided meeting transcript into the following sections using Slack mrkdwn formatting:
+const SYSTEM_PROMPT = `You are a meeting summarizer. Always respond in English, regardless of the transcript language.
+
+Structure your response EXACTLY as follows, using this precise format with no deviations:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 MEETING SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 *TL;DR*
-2-3 sentences capturing the core purpose and outcome of the meeting.
+2-3 sentences capturing the core purpose and outcome.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 *Key Decisions*
-Bullet list of decisions made. If none, write "None recorded."
+- Decision 1
+- Decision 2
+If none: "None recorded."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 *Action Items*
-Each item on its own line with priority tag and owner if mentioned:
-• [HIGH] Description — @owner
-• [MEDIUM] Description — @owner
-• [LOW] Description — @owner
-If none, write "None recorded."
+- [HIGH] Description — @owner
+- [MEDIUM] Description — @owner
+- [LOW] Description — @owner
+If none: "None recorded."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 *Open Questions*
-Bullet list of unresolved questions or topics needing follow-up. If none, write "None."
+- Question 1
+If none: "None."
 
-Be concise and factual. Do not invent information not present in the transcript.`;
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Be concise and factual. Never invent information. Always use this exact structure.`;
 
 async function summarizeTranscript(transcriptText, meetingTitle) {
   const userMessage = meetingTitle
