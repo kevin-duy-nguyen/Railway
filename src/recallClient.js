@@ -19,4 +19,23 @@ async function getTranscript(botId) {
   return res.data;
 }
 
-module.exports = { getBot, getTranscript };
+async function createTranscript(recordingId) {
+  const res = await axios.post(
+    `${BASE_URL}/recording/${recordingId}/create_transcript/`,
+    { provider: { recallai_async: { language_code: "en" } } },
+    { headers: headers() }
+  );
+  return res.data;
+}
+
+async function getTranscriptDownloadUrl(transcriptId) {
+  const res = await axios.get(`${BASE_URL}/transcript/${transcriptId}/`, { headers: headers() });
+  return res.data.download_url;
+}
+
+async function downloadTranscript(downloadUrl) {
+  const res = await axios.get(downloadUrl);
+  return res.data;
+}
+
+module.exports = { getBot, getTranscript, createTranscript, getTranscriptDownloadUrl, downloadTranscript };
