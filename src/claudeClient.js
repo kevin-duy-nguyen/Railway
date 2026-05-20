@@ -20,6 +20,16 @@ Projects:
 - Dejan Garz: Haircare E-Commerce, built with Webflow and Shopyflow
 - Dryll: Hydration Drinks E-Commerce on Shopify
 
+Team members (use these Slack IDs for @mentions in Action Items):
+- Kevin: <@U01FWNF6N1H>
+- George: <@U022HUWEQ9W>
+- Pilar / Pili: <@U039D3U193J>
+- Javier: <@U07B4L3M1S4>
+- Antoanetta: <@U07FL9H6057>
+- Felix: <@U013L09D89X>
+- Lukas: <@U0137HK464B>
+- Nils: <@U0130K9CBPY>
+
 Use this context to correctly identify people and projects even if names are unclear or misspelled in the transcript. Always respond in English regardless of transcript language.
 
 Structure your response EXACTLY as follows:
