@@ -29,7 +29,8 @@ async function handleWebhook(req, res) {
       getTranscript(botId),
     ]);
 
-    const meetingTitle = bot?.meeting_url?.title || bot?.metadata?.meeting_name || "";
+    const meetingTitle = bot?.meeting_metadata?.title || bot?.meeting_name || bot?.metadata?.title ||
+      "";
     const transcriptText = formatTranscript(transcriptData);
 
     if (!transcriptText) {
