@@ -11,7 +11,7 @@ async function handleWebhook(req, res) {
   // Acknowledge immediately — Recall.ai expects a fast 200
   res.status(200).json({ received: true });
 
-  if (eventType !== "bot.done") {
+  if (eventType !== "transcript.done") {
     return;
   }
 
