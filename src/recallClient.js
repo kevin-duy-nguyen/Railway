@@ -30,7 +30,8 @@ async function createTranscript(recordingId) {
 
 async function getTranscriptDownloadUrl(transcriptId) {
   const res = await axios.get(`${BASE_URL}/transcript/${transcriptId}/`, { headers: headers() });
-  return res.data.download_url;
+  console.log("[recall] transcript response:", JSON.stringify(res.data));
+  return res.data?.download_url || res.data?.data?.download_url || null;
 }
 
 async function downloadTranscript(downloadUrl) {
