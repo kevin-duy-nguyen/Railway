@@ -39,11 +39,18 @@ async function downloadTranscript(downloadUrl) {
 }
 
 async function getCalendarEventByBotId(botId) {
+  const bot = await getBot(botId);
+  const calMeetingId = bot?.calendar_meetings?.[0]?.id;
+  if (!calMeetingId) return null;
+  
+  const calUserId = bot?.calendar_meetings?.[0]?.calendar_user?.id;
+  if (!calUserId) return null;
+
   const res = await axios.get(
-    `https://${process.env.RECALL_REGION || "us-west-2"}.recall.ai/api/v2/calendar-events/?bot_id=${botId}`,
+    `https://${process.env.RECALL_REGION || "us-west-2"}.recall.ai/api/v1/calendar/v1/${calUserId}/events/${calMeetingId}/`,
     { headers: headers() }
   );
-  return res.data?.results?.[0] || null;
+  return res.data;
 }
 
 module.exports = { getBot, getTranscript, createTranscript, getTranscriptDownloadUrl, downloadTranscript, getCalendarEventByBotId };
