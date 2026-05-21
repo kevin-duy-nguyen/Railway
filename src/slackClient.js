@@ -10,15 +10,22 @@ function getClient() {
 }
 
 async function postSummary(channelId, meetingTitle, summary) {
-  const titleLine = meetingTitle
-  ? `*${meetingTitle}*`
-  : "";
+  const now = new Date();
+  const date = now.toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  });
 
-await getClient().chat.postMessage({
-  channel: channelId,
-  text: meetingTitle ? `${titleLine}\n\n${summary}` : summary,
-  mrkdwn: true,
-});
+  const titleLine = meetingTitle
+    ? `📋 *MEETING NOTES* — 🗓 ${meetingTitle} — 📅 ${date}`
+    : `📋 *MEETING NOTES* — 📅 ${date}`;
+
+  await getClient().chat.postMessage({
+    channel: channelId,
+    text: `${titleLine}\n\n${summary}`,
+    mrkdwn: true,
+  });
 }
 
 module.exports = { postSummary };
