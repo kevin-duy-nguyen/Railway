@@ -15,10 +15,13 @@ Team members:
 - Lukas: Co-founder, Manager, Design Lead, Branding, Strategy
 - Nils: Co-founder, Manager, Marketing Lead, Strategy
 
-Projects:
+Projects & involved People:
 - Drifft: Our own supplement brand (MAIN PROJECT — most P1–P12 calls relate to this)
-- Dejan Garz: Haircare E-Commerce, built with Webflow and Shopyflow
+- Dejan Garz: Haircare E-Commerce, built with Webflow and Shopyflow (Agency NewFlag operates the Shopify)
+  - Nadine: Works for NewFlag, E-Commerce, Projectmanagement
+  - Ersan: Works for Dejan, Strategy, Final Approval, Manager
 - Dryll: Hydration Drinks E-Commerce on Shopify
+  - Thimo, David, Paul, Jozef
 
 Team members (use these Slack IDs for @mentions in Action Items):
 - Kevin: <@U01FWNF6N1H>
@@ -34,8 +37,6 @@ Use this context to correctly identify people and projects even if names are unc
 
 Structure your response EXACTLY as follows:
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 MEETING SUMMARY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📝 *TL;DR*
