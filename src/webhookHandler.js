@@ -1,4 +1,4 @@
-const { getBot, createTranscript, getTranscriptDownloadUrl, downloadTranscript } = require("./recallClient");
+const { getBot, createTranscript, getTranscriptDownloadUrl, downloadTranscript, getCalendarEventByBotId } = require("./recallClient");
 const { formatTranscript } = require("./transcriptFormatter");
 const { summarizeTranscript } = require("./claudeClient");
 const { postSummary } = require("./slackClient");
@@ -43,7 +43,6 @@ async function handleWebhook(req, res) {
       return;
     }
 
-    // Deduplizieren per Recording ID
     if (recordingId && processedRecordings.has(recordingId)) {
       console.log(`[webhook] Already processed recording ${recordingId}, skipping.`);
       return;
@@ -62,13 +61,14 @@ async function handleWebhook(req, res) {
       }
     }
 
-    // Titel aus Calendar Integration via calendar_meetings
-    if (!meetingTitle) {
+    if (!meetingTitle && botId) {
       try {
-        const bot = await getBot(botId);
-        const calMeeting = bot?.calendar_meetings?.[0];
-        meetingTitle = calMeeting?.title || "";
-      } catch (e) {}
+        const calEvent = await getCalendarEventByBotId(botId);
+        meetingTitle = calEvent?.title || "";
+        console.log(`[webhook] Calendar title: "${meetingTitle}"`);
+      } catch (e) {
+        console.warn("[webhook] Could not fetch calendar event:", e.message);
+      }
     }
 
     console.log(`[webhook] transcript.done for transcript ${transcriptId}, meeting: "${meetingTitle}"`);
