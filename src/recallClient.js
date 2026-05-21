@@ -39,7 +39,10 @@ async function downloadTranscript(downloadUrl) {
 }
 
 async function getCalendarEventByBotId(botId) {
-  const res = await axios.get(`${BASE_URL}/calendar/v1/events/?bot_id=${botId}`, { headers: headers() });
+  const res = await axios.get(
+    `https://${process.env.RECALL_REGION || "us-west-2"}.recall.ai/api/v2/calendar-events/?bot_id=${botId}`,
+    { headers: headers() }
+  );
   return res.data?.results?.[0] || null;
 }
 
