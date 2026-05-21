@@ -1,9 +1,8 @@
-const { createTranscript, getTranscriptDownloadUrl, downloadTranscript } = require("./recallClient");
+const { getBot, createTranscript, getTranscriptDownloadUrl, downloadTranscript } = require("./recallClient");
 const { formatTranscript } = require("./transcriptFormatter");
 const { summarizeTranscript } = require("./claudeClient");
 const { postSummary } = require("./slackClient");
 const { resolveChannel } = require("./channelMap");
-const processedTranscripts = new Set();
 
 async function handleWebhook(req, res) {
   const event = req.body;
@@ -34,18 +33,33 @@ async function handleWebhook(req, res) {
   }
 
   if (eventType === "transcript.done") {
-    const transcriptId = event?.data?.transcript?.id;
-    if (processedTranscripts.has(transcriptId)) {
-      console.log(`[webhook] Duplicate transcript ${transcriptId}, skipping.`);
+    const provider = event?.data?.transcript?.provider;
+    if (provider && JSON.stringify(provider).includes("meeting_captions")) {
+      console.log("[webhook] Skipping meeting_captions transcript");
       return;
     }
-    processedTranscripts.add(transcriptId);
+
+    const transcriptId = event?.data?.transcript?.id;
     if (!transcriptId) {
       console.error("[webhook] transcript.done missing data.transcript.id");
       return;
     }
-    const meetingTitle = event?.data?.bot?.metadata?.meeting_name || "";
+
+    const botId = event?.data?.bot?.id;
+    let meetingTitle = event?.data?.bot?.metadata?.meeting_name || "";
+
+    if (!meetingTitle && botId) {
+      try {
+        const bot = await getBot(botId);
+        console.log("[webhook] bot object:", JSON.stringify(bot));
+        meetingTitle = bot?.meeting_metadata?.title || bot?.meeting_name || bot?.metadata?.meeting_name || "";
+      } catch (e) {
+        console.warn("[webhook] Could not fetch bot:", e.message);
+      }
+    }
+
     console.log(`[webhook] transcript.done for transcript ${transcriptId}, meeting: "${meetingTitle}"`);
+
     try {
       const downloadUrl = await getTranscriptDownloadUrl(transcriptId);
       if (!downloadUrl) {
