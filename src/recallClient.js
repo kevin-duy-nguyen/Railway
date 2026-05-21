@@ -22,7 +22,7 @@ async function getTranscript(botId) {
 async function createTranscript(recordingId) {
   const res = await axios.post(
     `${BASE_URL}/recording/${recordingId}/create_transcript/`,
-    { provider: { recallai_async: { } } },
+    { provider: { recallai_async: {} } },
     { headers: headers() }
   );
   return res.data;
@@ -30,7 +30,6 @@ async function createTranscript(recordingId) {
 
 async function getTranscriptDownloadUrl(transcriptId) {
   const res = await axios.get(`${BASE_URL}/transcript/${transcriptId}/`, { headers: headers() });
-  console.log("[recall] transcript response:", JSON.stringify(res.data));
   return res.data?.download_url || res.data?.data?.download_url || null;
 }
 
@@ -39,4 +38,9 @@ async function downloadTranscript(downloadUrl) {
   return res.data;
 }
 
-module.exports = { getBot, getTranscript, createTranscript, getTranscriptDownloadUrl, downloadTranscript };
+async function getCalendarEventByBotId(botId) {
+  const res = await axios.get(`${BASE_URL}/calendar/v1/events/?bot_id=${botId}`, { headers: headers() });
+  return res.data?.results?.[0] || null;
+}
+
+module.exports = { getBot, getTranscript, createTranscript, getTranscriptDownloadUrl, downloadTranscript, getCalendarEventByBotId };
