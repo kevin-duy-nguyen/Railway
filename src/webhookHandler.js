@@ -4,6 +4,8 @@ const { summarizeTranscript } = require("./claudeClient");
 const { postSummary } = require("./slackClient");
 const { resolveChannel } = require("./channelMap");
 
+const processedRecordings = new Set();
+
 async function handleWebhook(req, res) {
   const event = req.body;
   const eventType = event?.event;
@@ -33,17 +35,20 @@ async function handleWebhook(req, res) {
   }
 
   if (eventType === "transcript.done") {
-    const provider = event?.data?.transcript?.provider;
-    if (provider && JSON.stringify(provider).includes("meeting_captions")) {
-      console.log("[webhook] Skipping meeting_captions transcript");
-      return;
-    }
-
     const transcriptId = event?.data?.transcript?.id;
+    const recordingId = event?.data?.recording?.id;
+
     if (!transcriptId) {
       console.error("[webhook] transcript.done missing data.transcript.id");
       return;
     }
+
+    // Deduplizieren per Recording ID
+    if (recordingId && processedRecordings.has(recordingId)) {
+      console.log(`[webhook] Already processed recording ${recordingId}, skipping.`);
+      return;
+    }
+    if (recordingId) processedRecordings.add(recordingId);
 
     const botId = event?.data?.bot?.id;
     let meetingTitle = event?.data?.bot?.metadata?.meeting_name || "";
@@ -51,11 +56,19 @@ async function handleWebhook(req, res) {
     if (!meetingTitle && botId) {
       try {
         const bot = await getBot(botId);
-        console.log("[webhook] bot object:", JSON.stringify(bot));
         meetingTitle = bot?.meeting_metadata?.title || bot?.meeting_name || bot?.metadata?.meeting_name || "";
       } catch (e) {
         console.warn("[webhook] Could not fetch bot:", e.message);
       }
+    }
+
+    // Titel aus Calendar Integration via calendar_meetings
+    if (!meetingTitle) {
+      try {
+        const bot = await getBot(botId);
+        const calMeeting = bot?.calendar_meetings?.[0];
+        meetingTitle = calMeeting?.title || "";
+      } catch (e) {}
     }
 
     console.log(`[webhook] transcript.done for transcript ${transcriptId}, meeting: "${meetingTitle}"`);
