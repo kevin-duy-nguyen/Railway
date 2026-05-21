@@ -3,6 +3,7 @@ const { formatTranscript } = require("./transcriptFormatter");
 const { summarizeTranscript } = require("./claudeClient");
 const { postSummary } = require("./slackClient");
 const { resolveChannel } = require("./channelMap");
+const processedTranscripts = new Set();
 
 async function handleWebhook(req, res) {
   const event = req.body;
@@ -27,8 +28,18 @@ async function handleWebhook(req, res) {
     return;
   }
 
+  if (eventType === "meeting_metadata.done") {
+    console.log("[webhook] meeting_metadata.done:", JSON.stringify(event?.data));
+    return;
+  }
+
   if (eventType === "transcript.done") {
     const transcriptId = event?.data?.transcript?.id;
+    if (processedTranscripts.has(transcriptId)) {
+      console.log(`[webhook] Duplicate transcript ${transcriptId}, skipping.`);
+      return;
+    }
+    processedTranscripts.add(transcriptId);
     if (!transcriptId) {
       console.error("[webhook] transcript.done missing data.transcript.id");
       return;
