@@ -1,8 +1,9 @@
-const { getBot, createTranscript, getTranscriptDownloadUrl, downloadTranscript, getCalendarEventByBotId } = require("./recallClient");
+const { createTranscript, getTranscriptDownloadUrl, downloadTranscript, getCalendarEventByBotId } = require("./recallClient");
 const { formatTranscript } = require("./transcriptFormatter");
 const { summarizeTranscript } = require("./claudeClient");
 const { postSummary } = require("./slackClient");
 const { resolveChannel } = require("./channelMap");
+const { saveMeetingTitle, getMeetingTitle } = require("./supabaseClient");
 
 const processedRecordings = new Set();
 
@@ -11,6 +12,39 @@ async function handleWebhook(req, res) {
   const eventType = event?.event;
 
   res.status(200).json({ received: true });
+
+  if (eventType === "calendar.sync_events") {
+    console.log("[webhook] calendar.sync_events received");
+    try {
+      const calendarUserId = event?.data?.calendar_user?.id;
+      if (!calendarUserId) return;
+
+      const axios = require("axios");
+      const BASE_URL = `https://${process.env.RECALL_REGION || "us-west-2"}.recall.ai/api/v1`;
+      const res2 = await axios.get(
+        `${BASE_URL}/calendar/v1/${calendarUserId}/events/`,
+        {
+          headers: {
+            Authorization: `Token ${process.env.RECALL_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const events = res2.data?.results || [];
+      for (const calEvent of events) {
+        const botId = calEvent?.bot_id;
+        const title = calEvent?.raw?.summary || calEvent?.title || "";
+        if (botId && title) {
+          await saveMeetingTitle(botId, title);
+          console.log(`[webhook] Saved title "${title}" for bot ${botId}`);
+        }
+      }
+    } catch (err) {
+      console.error("[webhook] calendar.sync_events error:", err.message);
+    }
+    return;
+  }
 
   if (eventType === "recording.done") {
     const recordingId = event?.data?.recording?.id;
@@ -53,22 +87,8 @@ async function handleWebhook(req, res) {
     let meetingTitle = event?.data?.bot?.metadata?.meeting_name || "";
 
     if (!meetingTitle && botId) {
-      try {
-        const bot = await getBot(botId);
-        meetingTitle = bot?.meeting_metadata?.title || bot?.meeting_name || bot?.metadata?.meeting_name || "";
-      } catch (e) {
-        console.warn("[webhook] Could not fetch bot:", e.message);
-      }
-    }
-
-    if (!meetingTitle && botId) {
-      try {
-        const calEvent = await getCalendarEventByBotId(botId);
-        meetingTitle = calEvent?.title || "";
-        console.log(`[webhook] Calendar title: "${meetingTitle}"`);
-      } catch (e) {
-        console.warn("[webhook] Could not fetch calendar event:", e.message);
-      }
+      meetingTitle = await getMeetingTitle(botId) || "";
+      console.log(`[webhook] Supabase title: "${meetingTitle}"`);
     }
 
     console.log(`[webhook] transcript.done for transcript ${transcriptId}, meeting: "${meetingTitle}"`);
