@@ -23,3 +23,7 @@ app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
   console.log(`Webhook endpoint: POST http://localhost:${PORT}/webhook`);
 });
+
+app.get("/oauth/callback", (req, res) => {
+  res.send("OAuth callback received: " + JSON.stringify(req.query));
+});
