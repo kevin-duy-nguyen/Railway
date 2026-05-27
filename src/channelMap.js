@@ -3,7 +3,7 @@
  * Keywords are matched case-insensitively against the meeting title.
  * The first match wins; falls back to SLACK_CHANNEL_ID env var.
  *
- * Edit this list to add your own keyword → channel mappings.
+ * Edit this list to add your own keyword + channel mappings.
  */
 const CHANNEL_MAP = [
   { keyword: "P12 - AI Automations", channelId: process.env.SLACK_CHANNEL_P12 },
@@ -19,6 +19,46 @@ const CHANNEL_MAP = [
   // usw
 ];
 
+// Schedule: { day (0=Sun,1=Mon,...), startH, startM, endH, endM, title }
+const SCHEDULE = [
+  { day: 1, startH: 8, startM: 30, endH: 9,  endM: 0,  title: "Check-In Call" },
+  { day: 1, startH: 9, startM: 0,  endH: 9,  endM: 20, title: "P2 - Product and Packaging" },
+  { day: 2, startH: 8, startM: 30, endH: 8,  endM: 50, title: "P1 - Brand and Design Systems" },
+  { day: 2, startH: 8, startM: 50, endH: 9,  endM: 10, title: "P3 - Digital Store & Tech Stack" },
+  { day: 3, startH: 8, startM: 30, endH: 8,  endM: 50, title: "P4 - Data Analytics" },
+  { day: 3, startH: 8, startM: 50, endH: 9,  endM: 10, title: "P6 - Content, Social & Audience" },
+  { day: 3, startH: 9, startM: 10, endH: 9,  endM: 30, title: "P8 - Paid Media" },
+  { day: 4, startH: 8, startM: 30, endH: 8,  endM: 50, title: "P5 - Email communication" },
+  { day: 4, startH: 8, startM: 50, endH: 9,  endM: 10, title: "P12 - AI Automations" },
+  { day: 4, startH: 9, startM: 10, endH: 9,  endM: 30, title: "Dejan Garz | PM Weekly" },
+  { day: 5, startH: 9, startM: 30, endH: 10, endM: 30, title: "End of Week Update" },
+];
+
+function resolveTitleFromSchedule(joinAt) {
+  // joinAt: ISO string z.B. "2026-05-27T06:48:00Z"
+  try {
+    const date = new Date(joinAt);
+    // Berlin ist UTC+2 im Sommer
+    const berlinOffset = 2;
+    const local = new Date(date.getTime() + berlinOffset * 60 * 60 * 1000);
+    const day = local.getUTCDay();
+    const h = local.getUTCHours();
+    const m = local.getUTCMinutes();
+    const totalMin = h * 60 + m;
+
+    const match = SCHEDULE.find(s => {
+      if (s.day !== day) return false;
+      const start = s.startH * 60 + s.startM;
+      const end = s.endH * 60 + s.endM + 15; // 15min Puffer für Überlappungen
+      return totalMin >= start && totalMin < end;
+    });
+
+    return match?.title || "";
+  } catch {
+    return "";
+  }
+}
+
 function resolveChannel(meetingTitle = "") {
   const lower = meetingTitle.toLowerCase();
   for (const { keyword, channelId } of CHANNEL_MAP) {
@@ -29,4 +69,4 @@ function resolveChannel(meetingTitle = "") {
   return process.env.SLACK_CHANNEL_ID;
 }
 
-module.exports = { resolveChannel };
+module.exports = { resolveChannel, resolveTitleFromSchedule };
