@@ -2,7 +2,7 @@ const { createTranscript, getTranscriptDownloadUrl, downloadTranscript, getCalen
 const { formatTranscript } = require("./transcriptFormatter");
 const { summarizeTranscript } = require("./claudeClient");
 const { postSummary } = require("./slackClient");
-const { resolveChannel } = require("./channelMap");
+const { resolveChannel, resolveTitleFromSchedule } = require("./channelMap");
 const { saveMeetingTitle, getMeetingTitle } = require("./supabaseClient");
 const { getMeetingTitleFromGoogle } = require("./googleCalendarClient");
 
