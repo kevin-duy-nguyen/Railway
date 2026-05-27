@@ -1,4 +1,4 @@
-const { createTranscript, getTranscriptDownloadUrl, downloadTranscript, getCalendarEventByBotId } = require("./recallClient");
+const { createTranscript, getTranscriptDownloadUrl, downloadTranscript, getCalendarEventByBotId, getBot } = require("./recallClient");
 const { formatTranscript } = require("./transcriptFormatter");
 const { summarizeTranscript } = require("./claudeClient");
 const { postSummary } = require("./slackClient");
