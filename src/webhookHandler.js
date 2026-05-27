@@ -4,6 +4,7 @@ const { summarizeTranscript } = require("./claudeClient");
 const { postSummary } = require("./slackClient");
 const { resolveChannel } = require("./channelMap");
 const { saveMeetingTitle, getMeetingTitle } = require("./supabaseClient");
+const { getMeetingTitleFromGoogle } = require("./googleCalendarClient");
 
 const processedRecordings = new Set();
 
@@ -88,10 +89,17 @@ async function handleWebhook(req, res) {
 
     if (!meetingTitle && botId) {
       meetingTitle = await getMeetingTitle(botId) || "";
-      console.log(`[webhook] Supabase title: "${meetingTitle}"`);
     }
-
-    console.log(`[webhook] transcript.done for transcript ${transcriptId}, meeting: "${meetingTitle}"`);
+    
+    // NEU: Google Calendar Fallback
+    if (!meetingTitle) {
+      const bot = await getBot(botId).catch(() => null);
+      const meetingUrl = bot?.meeting_url?.meeting_id || "";
+      if (meetingUrl) {
+        meetingTitle = await getMeetingTitleFromGoogle(meetingUrl);
+        console.log(`[webhook] Google Calendar title: "${meetingTitle}"`);
+      }
+    }
 
     try {
       const downloadUrl = await getTranscriptDownloadUrl(transcriptId);
