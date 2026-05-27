@@ -91,13 +91,13 @@ async function handleWebhook(req, res) {
       meetingTitle = await getMeetingTitle(botId) || "";
     }
     
-    // NEU: Google Calendar Fallback
+    // Schedule Fallback
     if (!meetingTitle) {
       const bot = await getBot(botId).catch(() => null);
-      const meetingUrl = bot?.meeting_url?.meeting_id || "";
-      if (meetingUrl) {
-        meetingTitle = await getMeetingTitleFromGoogle(meetingUrl);
-        console.log(`[webhook] Google Calendar title: "${meetingTitle}"`);
+      const joinAt = bot?.join_at || "";
+      if (joinAt) {
+        meetingTitle = resolveTitleFromSchedule(joinAt);
+        console.log(`[webhook] Schedule title: "${meetingTitle}"`);
       }
     }
 
