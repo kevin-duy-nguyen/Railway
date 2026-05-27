@@ -1,51 +1,54 @@
 const axios = require("axios");
 
-const CLIENT_ID = process.env.GOOGLE_OAUTH_CLIENT_ID;
-const CLIENT_SECRET = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
-const REFRESH_TOKEN = process.env.GOOGLE_OAUTH_REFRESH_TOKEN;
+const BASE_URL = `https://${process.env.RECALL_REGION || "us-west-2"}.recall.ai/api/v1`;
 
-async function getAccessToken() {
-  const res = await axios.post("https://oauth2.googleapis.com/token", {
-    client_id: CLIENT_ID,
-    client_secret: CLIENT_SECRET,
-    refresh_token: REFRESH_TOKEN,
-    grant_type: "refresh_token",
-  });
-  return res.data.access_token;
+function headers() {
+  return {
+    Authorization: `Token ${process.env.RECALL_API_KEY}`,
+    "Content-Type": "application/json",
+  };
 }
 
-async function getMeetingTitleFromGoogle(meetingUrl) {
-  try {
-    const accessToken = await getAccessToken();
-    const now = new Date();
-    const timeMin = new Date(now - 24 * 60 * 60 * 1000).toISOString();
-    const timeMax = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
-
-    const res = await axios.get(
-      "https://www.googleapis.com/calendar/v3/calendars/primary/events",
-      {
-        headers: { Authorization: `Bearer ${accessToken}` },
-        params: {
-          timeMin,
-          timeMax,
-          singleEvents: true,
-          orderBy: "startTime",
-          maxResults: 50,
-        },
-      }
-    );
-
-    const events = res.data.items || [];
-    const match = events.find((e) => {
-      const link = e.hangoutLink || e.location || JSON.stringify(e.conferenceData || {});
-      return link && meetingUrl && link.includes(meetingUrl);
-    });
-
-    return match?.summary || "";
-  } catch (err) {
-    console.error("[googleCalendar] Error fetching title:", err.message);
-    return "";
-  }
+async function getBot(botId) {
+  const res = await axios.get(`${BASE_URL}/bot/${botId}/`, { headers: headers() });
+  return res.data;
 }
 
-module.exports = { getMeetingTitleFromGoogle };
+async function getTranscript(botId) {
+  const res = await axios.get(`${BASE_URL}/bot/${botId}/transcript/`, { headers: headers() });
+  return res.data;
+}
+
+async function createTranscript(recordingId) {
+  const res = await axios.post(
+    `${BASE_URL}/recording/${recordingId}/create_transcript/`,
+    { provider: { recallai_async: {} } },
+    { headers: headers() }
+  );
+  return res.data;
+}
+
+async function getTranscriptDownloadUrl(transcriptId) {
+  const res = await axios.get(`${BASE_URL}/transcript/${transcriptId}/`, { headers: headers() });
+  return res.data?.download_url || res.data?.data?.download_url || null;
+}
+
+async function downloadTranscript(downloadUrl) {
+  const res = await axios.get(downloadUrl);
+  return res.data;
+}
+
+async function getCalendarEventByBotId(botId) {
+  const bot = await getBot(botId);
+  const calMeetingId = bot?.calendar_meetings?.[0]?.id;
+  if (!calMeetingId) return null;
+  const calUserId = bot?.calendar_meetings?.[0]?.calendar_user?.id;
+  if (!calUserId) return null;
+  const res = await axios.get(
+    `https://${process.env.RECALL_REGION || "us-west-2"}.recall.ai/api/v1/calendar/v1/${calUserId}/events/${calMeetingId}/`,
+    { headers: headers() }
+  );
+  return res.data;
+}
+
+module.exports = { getBot, getTranscript, createTranscript, getTranscriptDownloadUrl, downloadTranscript, getCalendarEventByBotId };
