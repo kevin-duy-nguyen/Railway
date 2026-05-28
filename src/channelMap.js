@@ -21,17 +21,17 @@ const CHANNEL_MAP = [
 
 // Schedule: { day (0=Sun,1=Mon,...), startH, startM, endH, endM, title }
 const SCHEDULE = [
-  { day: 1, startH: 8, startM: 27, endH: 8,  endM: 57, title: "Check-In Call" },
-  { day: 1, startH: 8, startM: 57, endH: 9,  endM: 17, title: "P2 - Product and Packaging" },
-  { day: 2, startH: 8, startM: 27, endH: 8,  endM: 47, title: "P1 - Brand and Design Systems" },
-  { day: 2, startH: 8, startM: 47, endH: 9,  endM: 7,  title: "P3 - Digital Store & Tech Stack" },
-  { day: 3, startH: 8, startM: 27, endH: 8,  endM: 47, title: "P4 - Data Analytics" },
-  { day: 3, startH: 8, startM: 47, endH: 9,  endM: 7,  title: "P6 - Content, Social & Audience" },
-  { day: 3, startH: 9, startM: 7,  endH: 9,  endM: 27, title: "P8 - Paid Media" },
-  { day: 4, startH: 8, startM: 27, endH: 8,  endM: 47, title: "P5 - Email communication" },
-  { day: 4, startH: 8, startM: 47, endH: 9,  endM: 7,  title: "P12 - AI Automations" },
-  { day: 4, startH: 9, startM: 7,  endH: 9,  endM: 27, title: "Dejan Garz | PM Weekly" },
-  { day: 5, startH: 9, startM: 27, endH: 10, endM: 27, title: "End of Week Update" },
+  { day: 1, startH: 8, startM: 28, endH: 8,  endM: 57, title: "Check-In Call" },
+  { day: 1, startH: 8, startM: 58, endH: 9,  endM: 17, title: "P2 - Product and Packaging" },
+  { day: 2, startH: 8, startM: 28, endH: 8,  endM: 47, title: "P1 - Brand and Design Systems" },
+  { day: 2, startH: 8, startM: 48, endH: 9,  endM: 7,  title: "P3 - Digital Store & Tech Stack" },
+  { day: 3, startH: 8, startM: 28, endH: 8,  endM: 47, title: "P4 - Data Analytics" },
+  { day: 3, startH: 8, startM: 48, endH: 9,  endM: 7,  title: "P6 - Content, Social & Audience" },
+  { day: 3, startH: 9, startM: 8,  endH: 9,  endM: 27, title: "P8 - Paid Media" },
+  { day: 4, startH: 8, startM: 28, endH: 8,  endM: 47, title: "P5 - Email communication" },
+  { day: 4, startH: 8, startM: 48, endH: 9,  endM: 7,  title: "P12 - AI Automations" },
+  { day: 4, startH: 9, startM: 8,  endH: 9,  endM: 27, title: "Dejan Garz | PM Weekly" },
+  { day: 5, startH: 9, startM: 28, endH: 10, endM: 27, title: "End of Week Update" },
 ];
 
 function resolveTitleFromSchedule(joinAt) {
