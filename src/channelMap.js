@@ -49,7 +49,7 @@ function resolveTitleFromSchedule(joinAt) {
     const match = SCHEDULE.find(s => {
       if (s.day !== day) return false;
       const start = s.startH * 60 + s.startM;
-      const end = s.endH * 60 + s.endM + 15; // 15min Puffer für Überlappungen
+      const end = s.endH * 60 + s.endM; 
       return totalMin >= start && totalMin < end;
     });
 
