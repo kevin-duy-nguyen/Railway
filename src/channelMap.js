@@ -22,7 +22,7 @@ const CHANNEL_MAP = [
 // Schedule: { day (0=Sun,1=Mon,...), startH, startM, endH, endM, title }
 const SCHEDULE = [
   { day: 1, startH: 8, startM: 28, endH: 8,  endM: 57, title: "Check-In Call" },
-  { day: 1, startH: 8, startM: 58, endH: 9,  endM: 17, title: "P2 - Product and Packaging" },
+  { day: 1, startH: 9, startM: 28, endH: 9,  endM: 47, title: "P2 - Product and Packaging" },
   { day: 2, startH: 8, startM: 28, endH: 8,  endM: 47, title: "P1 - Brand and Design Systems" },
   { day: 2, startH: 8, startM: 48, endH: 9,  endM: 7,  title: "P3 - Digital Store & Tech Stack" },
   { day: 3, startH: 8, startM: 28, endH: 8,  endM: 47, title: "P4 - Data Analytics" },
