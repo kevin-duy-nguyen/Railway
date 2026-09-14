@@ -22,7 +22,10 @@ const CHANNEL_MAP = [
 // Schedule: { day (0=Sun,1=Mon,...), startH, startM, endH, endM, title }
 const SCHEDULE = [
   { day: 1, startH: 8, startM: 28, endH: 8,  endM: 57, title: "Check-In Call" },
-  { day: 1, startH: 9, startM: 28, endH: 9,  endM: 47, title: "P2 - Product and Packaging" },
+  // P2 steht im Kalender auf 9:30, das Team startet aber oft direkt nach dem
+  // Check-In. Fenster beginnt daher schon 8:57 (nahtlos nach dem Check-In-
+  // Fenster), damit ein vorgezogenes join_at weiterhin als P2 erkannt wird.
+  { day: 1, startH: 8, startM: 57, endH: 9,  endM: 47, title: "P2 - Product and Packaging" },
   { day: 2, startH: 8, startM: 28, endH: 8,  endM: 47, title: "P1 - Brand and Design Systems" },
   { day: 2, startH: 8, startM: 48, endH: 9,  endM: 7,  title: "P3 - Digital Store & Tech Stack" },
   { day: 3, startH: 8, startM: 28, endH: 8,  endM: 47, title: "P4 - Data Analytics" },
@@ -38,12 +41,23 @@ function resolveTitleFromSchedule(joinAt) {
   // joinAt: ISO string z.B. "2026-05-27T06:48:00Z"
   try {
     const date = new Date(joinAt);
-    // Berlin ist UTC+2 im Sommer
-    const berlinOffset = 2;
-    const local = new Date(date.getTime() + berlinOffset * 60 * 60 * 1000);
-    const day = local.getUTCDay();
-    const h = local.getUTCHours();
-    const m = local.getUTCMinutes();
+    if (Number.isNaN(date.getTime())) return "";
+
+    // Echte Berliner Ortszeit inkl. Sommer-/Winterzeit.
+    // (Vorher war UTC+2 fest verdrahtet -> ab Ende Oktober 1h daneben.)
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Europe/Berlin",
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(date);
+    const part = (type) => parts.find((x) => x.type === type)?.value;
+
+    const DAYS = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    const day = DAYS[part("weekday")];
+    const h = Number(part("hour")) % 24;
+    const m = Number(part("minute"));
     const totalMin = h * 60 + m;
 
     const match = SCHEDULE.find(s => {
