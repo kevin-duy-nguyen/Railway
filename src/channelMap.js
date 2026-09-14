@@ -37,6 +37,27 @@ const SCHEDULE = [
   { day: 5, startH: 9, startM: 28, endH: 10, endM: 27, title: "End of Week Update" },
 ];
 
+/**
+ * Verkettete Calls: sobald `after` endet, rueckt der Bot von `next` sofort nach,
+ * statt auf sein regulaeres join_at (2 Minuten vor Kalenderstart) zu warten.
+ *
+ * Hintergrund: montags wechselt das Team direkt vom Check-In in den P2-Call, oft
+ * deutlich vor 9:30. Der Anfang fehlte dadurch regelmaessig im Transkript.
+ *
+ * maxAdvanceMin begrenzt, wie weit vorgezogen wird. Endet der Check-In sehr frueh,
+ * wuerde der Bot sonst im Google-Meet-Warteraum verfallen (dort gilt ein hartes
+ * Limit von 10 Minuten) und der Call waere am Ende gar nicht aufgezeichnet.
+ */
+const FOLLOW_UP = [
+  { after: "Check-In Call", next: "P2 - Product and Packaging", maxAdvanceMin: 30 },
+];
+
+function resolveFollowUp(endedTitle = "") {
+  if (!endedTitle) return null;
+  const lower = endedTitle.toLowerCase();
+  return FOLLOW_UP.find((f) => lower.includes(f.after.toLowerCase())) || null;
+}
+
 function resolveTitleFromSchedule(joinAt) {
   // joinAt: ISO string z.B. "2026-05-27T06:48:00Z"
   try {
@@ -83,4 +104,4 @@ function resolveChannel(meetingTitle = "") {
   return process.env.SLACK_CHANNEL_ID;
 }
 
-module.exports = { resolveChannel, resolveTitleFromSchedule };
+module.exports = { resolveChannel, resolveTitleFromSchedule, resolveFollowUp };

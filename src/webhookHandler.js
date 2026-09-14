@@ -1,12 +1,122 @@
-const { createTranscript, getTranscriptDownloadUrl, downloadTranscript, getCalendarEventByBotId, getBot } = require("./recallClient");
+const { createTranscript, getTranscriptDownloadUrl, downloadTranscript, getCalendarEventByBotId, getBot, listCalendarEvents, updateBotJoinAt } = require("./recallClient");
 const { formatTranscript } = require("./transcriptFormatter");
 const { summarizeTranscript } = require("./claudeClient");
 const { postSummary } = require("./slackClient");
-const { resolveChannel, resolveTitleFromSchedule } = require("./channelMap");
+const { resolveChannel, resolveTitleFromSchedule, resolveFollowUp } = require("./channelMap");
 const { saveMeetingTitle, getMeetingTitle } = require("./supabaseClient");
 const { getMeetingTitleFromGoogle } = require("./googleCalendarClient");
 
 const processedRecordings = new Set();
+const advancedBots = new Set();
+
+/**
+ * Tritt der Bot dem Folge-Call frueher bei, muss er laenger auf das Team warten:
+ * - waiting_room_timeout: Google Meet deckelt hart bei 600s, hoehere Werte verpuffen.
+ * - everyone_left_timeout: Default sind 2 Sekunden. Laesst die erste Person den Bot
+ *   rein und geht nochmal kurz raus, waere er sofort wieder draussen.
+ */
+const FOLLOW_UP_AUTOMATIC_LEAVE = {
+  waiting_room_timeout: 600,
+  everyone_left_timeout: { timeout: 300 },
+};
+
+function berlinDay(date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Berlin",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function eventTitle(e) {
+  return e?.raw?.summary || e?.title || "";
+}
+
+function eventStart(e) {
+  return e?.start_time || e?.raw?.start?.dateTime || e?.raw?.start?.date || "";
+}
+
+async function resolveMeetingTitle(botId, metadataName = "", prefetchedBot) {
+  let title = metadataName || "";
+  if (!title && botId) {
+    title = (await getMeetingTitle(botId)) || "";
+  }
+  if (!title && botId) {
+    const bot = prefetchedBot !== undefined ? prefetchedBot : await getBot(botId).catch(() => null);
+    const joinAt = bot?.join_at || "";
+    if (joinAt) {
+      title = resolveTitleFromSchedule(joinAt);
+      console.log(`[webhook] Schedule title: "${title}"`);
+    }
+  }
+  return title;
+}
+
+/**
+ * Zieht den Bot des Folge-Calls vor, sobald der vorherige Call endet.
+ * Best-effort: schlaegt irgendetwas fehl, bleibt der Bot auf seinem regulaeren
+ * join_at stehen und es aendert sich gegenueber vorher nichts.
+ */
+async function advanceFollowUpBot(endedBotId) {
+  const endedBot = await getBot(endedBotId).catch(() => null);
+  const endedTitle = await resolveMeetingTitle(endedBotId, "", endedBot);
+  const followUp = resolveFollowUp(endedTitle);
+  if (!followUp) return;
+
+  console.log(`[followUp] "${endedTitle}" ended - looking for today's "${followUp.next}".`);
+
+  const calendarUserId = endedBot?.calendar_meetings?.[0]?.calendar_user?.id;
+  if (!calendarUserId) {
+    console.warn(`[followUp] No calendar user on bot ${endedBotId}, skipping.`);
+    return;
+  }
+
+  const today = berlinDay(new Date());
+  const wanted = followUp.next.toLowerCase();
+  const events = await listCalendarEvents(calendarUserId);
+  const target = events.find((e) => {
+    if (!eventTitle(e).toLowerCase().includes(wanted)) return false;
+    const start = Date.parse(eventStart(e));
+    return !Number.isNaN(start) && berlinDay(new Date(start)) === today;
+  });
+
+  if (!target) {
+    console.log(`[followUp] No "${followUp.next}" event today, nothing to advance.`);
+    return;
+  }
+
+  const targetBotId = target.bot_id;
+  if (!targetBotId) {
+    console.warn(`[followUp] "${followUp.next}" today has no scheduled bot.`);
+    return;
+  }
+  if (advancedBots.has(targetBotId)) {
+    console.log(`[followUp] Bot ${targetBotId} already advanced, skipping.`);
+    return;
+  }
+
+  const startMs = Date.parse(eventStart(target));
+  if (Number.isNaN(startMs)) {
+    console.warn(`[followUp] Unreadable start time on "${followUp.next}", skipping.`);
+    return;
+  }
+
+  // Der Bot betritt den Call regulaer ~2 Minuten vor Start. Ab dann laesst er
+  // sich nicht mehr umterminieren, also gar nicht erst versuchen.
+  const now = Date.now();
+  if (now >= startMs - 3 * 60 * 1000) {
+    console.log(`[followUp] "${followUp.next}" starts too soon - leaving schedule untouched.`);
+    return;
+  }
+
+  const earliest = startMs - followUp.maxAdvanceMin * 60 * 1000;
+  const joinAt = new Date(Math.max(now + 60 * 1000, earliest));
+
+  await updateBotJoinAt(targetBotId, joinAt.toISOString(), FOLLOW_UP_AUTOMATIC_LEAVE);
+  advancedBots.add(targetBotId);
+  console.log(`[followUp] Advanced "${followUp.next}" bot ${targetBotId} to ${joinAt.toISOString()}`);
+}
 
 async function handleWebhook(req, res) {
   const event = req.body;
@@ -20,19 +130,7 @@ async function handleWebhook(req, res) {
       const calendarUserId = event?.data?.calendar_user?.id;
       if (!calendarUserId) return;
 
-      const axios = require("axios");
-      const BASE_URL = `https://${process.env.RECALL_REGION || "us-west-2"}.recall.ai/api/v1`;
-      const res2 = await axios.get(
-        `${BASE_URL}/calendar/v1/${calendarUserId}/events/`,
-        {
-          headers: {
-            Authorization: `Token ${process.env.RECALL_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      const events = res2.data?.results || [];
+      const events = await listCalendarEvents(calendarUserId);
       for (const calEvent of events) {
         const botId = calEvent?.bot_id;
         const title = calEvent?.raw?.summary || calEvent?.title || "";
@@ -61,6 +159,18 @@ async function handleWebhook(req, res) {
       console.error(`[webhook] Failed to create transcript job:`, err.message);
       if (err.response?.data) console.error(JSON.stringify(err.response.data));
     }
+
+    const endedBotId = event?.data?.bot?.id;
+    if (endedBotId) {
+      try {
+        await advanceFollowUpBot(endedBotId);
+      } catch (err) {
+        console.error("[followUp] Error:", err.message);
+        if (err.response?.data) console.error(JSON.stringify(err.response.data));
+      }
+    } else {
+      console.warn("[followUp] recording.done without data.bot.id - cannot check follow-up.");
+    }
     return;
   }
 
@@ -85,21 +195,7 @@ async function handleWebhook(req, res) {
     if (recordingId) processedRecordings.add(recordingId);
 
     const botId = event?.data?.bot?.id;
-    let meetingTitle = event?.data?.bot?.metadata?.meeting_name || "";
-
-    if (!meetingTitle && botId) {
-      meetingTitle = await getMeetingTitle(botId) || "";
-    }
-    
-    // Schedule Fallback
-    if (!meetingTitle) {
-      const bot = await getBot(botId).catch(() => null);
-      const joinAt = bot?.join_at || "";
-      if (joinAt) {
-        meetingTitle = resolveTitleFromSchedule(joinAt);
-        console.log(`[webhook] Schedule title: "${meetingTitle}"`);
-      }
-    }
+    const meetingTitle = await resolveMeetingTitle(botId, event?.data?.bot?.metadata?.meeting_name);
 
     try {
       const downloadUrl = await getTranscriptDownloadUrl(transcriptId);

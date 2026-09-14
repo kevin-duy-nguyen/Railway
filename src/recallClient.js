@@ -38,6 +38,26 @@ async function downloadTranscript(downloadUrl) {
   return res.data;
 }
 
+async function listCalendarEvents(calendarUserId) {
+  const res = await axios.get(`${BASE_URL}/calendar/v1/${calendarUserId}/events/`, {
+    headers: headers(),
+  });
+  return res.data?.results || [];
+}
+
+/**
+ * Terminiert einen bereits geplanten Bot um. Funktioniert nur solange er dem
+ * Meeting noch nicht beigetreten ist; Calendar-V2-Bots sind ausgenommen (wir
+ * nutzen V1). join_at unter 10 Minuten in der Zukunft macht daraus einen
+ * Ad-hoc-Bot, der praktisch sofort joint.
+ */
+async function updateBotJoinAt(botId, joinAtIso, automaticLeave) {
+  const body = { join_at: joinAtIso };
+  if (automaticLeave) body.automatic_leave = automaticLeave;
+  const res = await axios.patch(`${BASE_URL}/bot/${botId}/`, body, { headers: headers() });
+  return res.data;
+}
+
 async function getCalendarEventByBotId(botId) {
   const bot = await getBot(botId);
   const calMeetingId = bot?.calendar_meetings?.[0]?.id;
@@ -51,4 +71,4 @@ async function getCalendarEventByBotId(botId) {
   return res.data;
 }
 
-module.exports = { getBot, getTranscript, createTranscript, getTranscriptDownloadUrl, downloadTranscript, getCalendarEventByBotId };
+module.exports = { getBot, getTranscript, createTranscript, getTranscriptDownloadUrl, downloadTranscript, getCalendarEventByBotId, listCalendarEvents, updateBotJoinAt };
