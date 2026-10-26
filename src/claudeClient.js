@@ -73,13 +73,27 @@ async function summarizeTranscript(transcriptText, meetingTitle) {
     : `Transcript:\n${transcriptText}`;
 
   const message = await client.messages.create({
-    model: "claude-sonnet-4-5",
-    max_tokens: 1024,
+    model: "claude-sonnet-5-5",
+    // Thinking laeuft auf Sonnet 5.5 standardmaessig mit und zaehlt gegen
+    // max_tokens. Die alten 1024 haetten die Summary abgeschnitten.
+    max_tokens: 8000,
+    // Zusammenfassen nach festem Template braucht keine grosse Denktiefe.
+    // Default waere "high" und damit unnoetig teuer.
+    output_config: { effort: "low" },
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: userMessage }],
   });
 
-  return message.content[0].text;
+  // Nicht content[0] nehmen: mit aktivem Thinking kann der erste Block ein
+  // thinking-Block sein, dessen .text undefined ist - das landete sonst
+  // wortwoertlich als "undefined" in Slack.
+  const summary = message.content.find((block) => block.type === "text")?.text;
+  if (!summary) {
+    throw new Error(
+      `Keine Textantwort von Claude erhalten (stop_reason: ${message.stop_reason})`
+    );
+  }
+  return summary;
 }
 
 module.exports = { summarizeTranscript };
