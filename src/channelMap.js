@@ -16,6 +16,12 @@ const CHANNEL_MAP = [
   { keyword: "P8 - Paid Media", channelId: process.env.SLACK_CHANNEL_P8 },
   { keyword: "End of Week Update", channelId: process.env.SLACK_CHANNEL_EOW },
   { keyword: "Check-In Call", channelId: process.env.SLACK_CHANNEL_CHECK_IN },
+  // Alle drei Marketing-Calls teilen sich #digital-marketing. Der Kanal ist
+  // privat - ohne Einladung des Bots schlaegt der Post fehl.
+  // "Marketing Week Kick-Off" enthaelt nicht "marketing weekly", die beiden
+  // Keywords greifen also nicht ineinander.
+  { keyword: "Marketing Week Kick-Off", channelId: process.env.SLACK_CHANNEL_MARKETING },
+  { keyword: "Marketing weekly", channelId: process.env.SLACK_CHANNEL_MARKETING },
   // usw
 ];
 
@@ -26,14 +32,19 @@ const SCHEDULE = [
   // Check-In. Fenster beginnt daher schon 8:57 (nahtlos nach dem Check-In-
   // Fenster), damit ein vorgezogenes join_at weiterhin als P2 erkannt wird.
   { day: 1, startH: 8, startM: 57, endH: 9,  endM: 47, title: "P2 - Product and Packaging" },
+  // "Marketing Week Kick-Off" (Mo 9:00) fehlt hier bewusst: sein Fenster laege
+  // mitten im vorgezogenen P2-Fenster. Zwei parallele Calls lassen sich ueber
+  // die Uhrzeit nicht auseinanderhalten.
   { day: 2, startH: 8, startM: 28, endH: 8,  endM: 47, title: "P1 - Brand and Design Systems" },
   { day: 2, startH: 8, startM: 48, endH: 9,  endM: 7,  title: "P3 - Digital Store & Tech Stack" },
   { day: 3, startH: 8, startM: 28, endH: 8,  endM: 47, title: "P4 - Data Analytics" },
   { day: 3, startH: 8, startM: 48, endH: 9,  endM: 7,  title: "P6 - Content, Social & Audience" },
   { day: 3, startH: 9, startM: 8,  endH: 9,  endM: 27, title: "P8 - Paid Media" },
+  { day: 3, startH: 11, startM: 58, endH: 12, endM: 17, title: "Marketing weekly" },
   { day: 4, startH: 8, startM: 28, endH: 8,  endM: 47, title: "P5 - Email communication" },
   { day: 4, startH: 8, startM: 48, endH: 9,  endM: 7,  title: "P12 - AI Automations" },
   { day: 4, startH: 9, startM: 8,  endH: 9,  endM: 27, title: "Dejan Garz | PM Weekly" },
+  { day: 4, startH: 11, startM: 28, endH: 11, endM: 47, title: "Marketing weekly" },
   { day: 5, startH: 9, startM: 28, endH: 10, endM: 27, title: "End of Week Update" },
 ];
 
@@ -109,9 +120,8 @@ function resolveChannel(meetingTitle = "") {
  * IDs statt Namen, weil die Namen Geviertstriche enthalten und umbenannt
  * werden koennen - beides waere eine stille Fehlerquelle.
  *
- * P8 fehlt bewusst: unsere Config kennt "P8 - Paid Media", Gyuri nennt
- * "Operations & Supply Chain". Bis das geklaert ist, lieber gar kein Task
- * als einer im falschen Projekt.
+ * Die Marketing-Calls stehen bewusst nicht hier: sie sind uebergreifend,
+ * dort waehlt Claude die Pipeline pro Action Item.
  */
 const PIPELINE_MAP = [
   { keyword: "P12 - AI Automations",           project: "b4fdc545-a054-41ad-9f36-556144ba3df8" }, // 12 AI Automation
@@ -121,6 +131,7 @@ const PIPELINE_MAP = [
   { keyword: "P4 - Data Analytics",            project: "8d528710-4c2c-471e-94c0-31d7977c7a58" }, // 04 Data, Analytics & Measurement
   { keyword: "P5 - Email communication",       project: "1e9582e3-04b9-4778-ae03-d7978d3cbe1d" }, // 05 Shop - Email & Customer Communication
   { keyword: "P6 - Content, Social & Audience",project: "7677d5d8-ef1b-4cff-83df-412f4866c51d" }, // Shop - Content & social
+  { keyword: "P8 - Paid Media",                project: "5c11d5db-2339-4925-bada-58763ee3ae21" }, // Shop - Paid media
   { keyword: "Dejan Garz",                     project: "a07e0635-b741-4b5d-92b2-18674ecfa69d" }, // Dejan Garz (clients)
 ];
 
@@ -131,4 +142,16 @@ function resolvePipeline(meetingTitle = "") {
   }
   return null;
 }
-module.exports = { resolveChannel, resolveTitleFromSchedule, resolveFollowUp, resolvePipeline };
+/**
+ * Uebergreifende Runden, aus denen bewusst keine Tasks entstehen. Dort wird
+ * quer durchs Team berichtet statt verteilt; was daraus wirklich ein Task
+ * wird, traegt jemand selbst ein. Die Zusammenfassung laeuft unveraendert.
+ */
+const NO_TASKS = ["Check-In Call", "End of Week Update"];
+
+function createsTasks(meetingTitle = "") {
+  const lower = meetingTitle.toLowerCase();
+  return !NO_TASKS.some((t) => lower.includes(t.toLowerCase()));
+}
+
+module.exports = { resolveChannel, resolveTitleFromSchedule, resolveFollowUp, resolvePipeline, createsTasks };

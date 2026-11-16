@@ -2,7 +2,7 @@ const { createTranscript, getTranscriptDownloadUrl, downloadTranscript, getCalen
 const { formatTranscript } = require("./transcriptFormatter");
 const { summarizeTranscript } = require("./claudeClient");
 const { postSummary } = require("./slackClient");
-const { resolveChannel, resolveTitleFromSchedule, resolveFollowUp, resolvePipeline } = require("./channelMap");
+const { resolveChannel, resolveTitleFromSchedule, resolveFollowUp, resolvePipeline, createsTasks } = require("./channelMap");
 const { parseActionItems } = require("./actionItems");
 const { createTask, isConfigured: pmConfigured } = require("./drifftPmClient");
 const { classifyActionItems } = require("./pipelineClassifier");
@@ -40,6 +40,11 @@ function eventStart(e) {
   return e?.start_time || e?.raw?.start?.dateTime || e?.raw?.start?.date || "";
 }
 
+/**
+ * Liefert { title, guessed }. `guessed` ist true, wenn der Titel nur aus dem
+ * Zeitplan abgeleitet wurde - also weder in den Bot-Metadaten noch in Supabase
+ * stand. Ein so geratener Titel darf keine feste Pipeline setzen.
+ */
 async function resolveMeetingTitle(botId, metadataName = "", prefetchedBot) {
   let title = metadataName || "";
   if (!title && botId) {
@@ -51,9 +56,10 @@ async function resolveMeetingTitle(botId, metadataName = "", prefetchedBot) {
     if (joinAt) {
       title = resolveTitleFromSchedule(joinAt);
       console.log(`[webhook] Schedule title: "${title}"`);
+      if (title) return { title, guessed: true };
     }
   }
-  return title;
+  return { title, guessed: false };
 }
 
 /**
@@ -63,7 +69,7 @@ async function resolveMeetingTitle(botId, metadataName = "", prefetchedBot) {
  */
 async function advanceFollowUpBot(endedBotId) {
   const endedBot = await getBot(endedBotId).catch(() => null);
-  const endedTitle = await resolveMeetingTitle(endedBotId, "", endedBot);
+  const { title: endedTitle } = await resolveMeetingTitle(endedBotId, "", endedBot);
   const followUp = resolveFollowUp(endedTitle);
   if (!followUp) return;
 
@@ -128,9 +134,13 @@ async function advanceFollowUpBot(endedBotId) {
  * Fehler hier bleibt folgenlos fuer ihn. Ohne API-Key passiert gar nichts,
  * damit sich gefahrlos deployen laesst, bevor der Key existiert.
  */
-async function createTasksFromSummary({ summary, meetingTitle, recordingId, sourceUrl }) {
+async function createTasksFromSummary({ summary, meetingTitle, recordingId, sourceUrl, titleGuessed }) {
   if (!pmConfigured()) {
     console.log("[pm] Kein DRIFFT_PM_API_KEY gesetzt - Task-Anlage uebersprungen.");
+    return;
+  }
+  if (!createsTasks(meetingTitle)) {
+    console.log(`[pm] "${meetingTitle}" erzeugt bewusst keine Tasks.`);
     return;
   }
 
@@ -140,11 +150,18 @@ async function createTasksFromSummary({ summary, meetingTitle, recordingId, sour
     return;
   }
 
-  // Calls mit festem Thema gehen komplett in ihre Pipeline. Uebergreifende
-  // Runden - Check-In, End of Week, die Marketing-Calls - haben keine, dort
-  // waehlt Claude pro Item. Ein Item ohne passende Pipeline wird ausgelassen,
-  // weil ein Task im falschen Projekt schlechter ist als keiner.
-  const fixed = resolvePipeline(meetingTitle);
+  // Calls mit festem Thema gehen komplett in ihre Pipeline. Die Marketing-Calls
+  // sind uebergreifend und haben keine, dort waehlt Claude pro Item. Ein Item
+  // ohne passende Pipeline wird ausgelassen, weil ein Task im falschen Projekt
+  // schlechter ist als keiner.
+  //
+  // Ein nur geratener Titel bekommt ebenfalls keine feste Pipeline: montags
+  // ueberlappen Marketing-Kick-Off und das vorgezogene P2-Fenster, der Zeitplan
+  // allein kann die beiden nicht trennen.
+  if (titleGuessed) {
+    console.log(`[pm] Titel "${meetingTitle}" nur aus dem Zeitplan geraten - Claude waehlt pro Item.`);
+  }
+  const fixed = titleGuessed ? null : resolvePipeline(meetingTitle);
   const projects = fixed
     ? items.map(() => fixed)
     : await classifyActionItems(items, meetingTitle);
@@ -254,7 +271,7 @@ async function handleWebhook(req, res) {
     if (recordingId) processedRecordings.add(recordingId);
 
     const botId = event?.data?.bot?.id;
-    const meetingTitle = await resolveMeetingTitle(botId, event?.data?.bot?.metadata?.meeting_name);
+    const { title: meetingTitle, guessed: titleGuessed } = await resolveMeetingTitle(botId, event?.data?.bot?.metadata?.meeting_name);
 
     try {
       const downloadUrl = await getTranscriptDownloadUrl(transcriptId);
@@ -281,7 +298,7 @@ async function handleWebhook(req, res) {
       const permalink = await postSummary(channelId, meetingTitle, summary);
       console.log(`[webhook] Summary posted to Slack channel ${channelId}`);
 
-      await createTasksFromSummary({ summary, meetingTitle, recordingId, sourceUrl: permalink });
+      await createTasksFromSummary({ summary, meetingTitle, recordingId, sourceUrl: permalink, titleGuessed });
     } catch (err) {
       console.error(`[webhook] Error processing transcript ${transcriptId}:`, err.message);
       if (err.response?.data) console.error(JSON.stringify(err.response.data));
