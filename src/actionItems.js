@@ -10,15 +10,22 @@
  */
 
 // Slack-User-ID -> Name, wie er in drifft PM heisst.
-const PM_NAME_BY_SLACK_ID = {
-  U01FWNF6N1H: "Kevin",
-  U022HUWEQ9W: "George",
-  U039D3U193J: "Pilar",
-  U07B4L3M1S4: "Javier",
-  U07FL9H6057: "Antoaneta",
-  U013L09D89X: "Felix",
-  U0137HK464B: "Lukas",
-  U0130K9CBPY: "Nils",
+/**
+ * Slack-ID -> Benutzername in drifft PM.
+ *
+ * Bewusst der Username, nicht der Anzeigename: die API nimmt laut eigener
+ * Doku "id, username or e-mail". Ein Anzeigename wie "Kevin" steht nicht
+ * auf der Liste - die Zuweisung koennte stillschweigend leer bleiben.
+ */
+const PM_USER_BY_SLACK_ID = {
+  U01FWNF6N1H: "kevin",
+  U022HUWEQ9W: "george",
+  U039D3U193J: "pilar",
+  U07B4L3M1S4: "javier",
+  U07FL9H6057: "antoaneta",
+  U013L09D89X: "felix",
+  U0137HK464B: "lukas",
+  U0130K9CBPY: "nils",
 };
 
 const PM_PRIORITY_BY_LABEL = { HIGH: "P1", MEDIUM: "P2", LOW: "P3" };
@@ -55,11 +62,11 @@ function parseActionItems(summary = "") {
     items.push({
       title,
       priority: PM_PRIORITY_BY_LABEL[label],
-      assignee: slackId ? PM_NAME_BY_SLACK_ID[slackId] || null : null,
+      assignee: slackId ? PM_USER_BY_SLACK_ID[slackId] || null : null,
       ownerRaw,
     });
   }
   return items;
 }
 
-module.exports = { parseActionItems, PM_NAME_BY_SLACK_ID, PM_PRIORITY_BY_LABEL };
+module.exports = { parseActionItems, PM_USER_BY_SLACK_ID, PM_PRIORITY_BY_LABEL };

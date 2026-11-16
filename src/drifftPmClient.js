@@ -28,7 +28,9 @@ async function getMe() {
  * Transkript erneut verarbeitet, entsteht kein Duplikat.
  */
 async function createTask({ project, title, assignee, due_date, priority, source_url, external_ref }) {
-  const body = { project, title };
+  // Das Feld heisst project_id. "project" gibt es auch, erwartet dort aber den
+  // Pipeline-NAMEN - eine ID darin waere stillschweigend falsch.
+  const body = { project_id: project, title };
   if (assignee) body.assignee = assignee;
   if (due_date) body.due_date = due_date;
   if (priority) body.priority = priority;
