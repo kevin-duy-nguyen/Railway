@@ -2,7 +2,9 @@ const { createTranscript, getTranscriptDownloadUrl, downloadTranscript, getCalen
 const { formatTranscript } = require("./transcriptFormatter");
 const { summarizeTranscript } = require("./claudeClient");
 const { postSummary } = require("./slackClient");
-const { resolveChannel, resolveTitleFromSchedule, resolveFollowUp } = require("./channelMap");
+const { resolveChannel, resolveTitleFromSchedule, resolveFollowUp, resolvePipeline } = require("./channelMap");
+const { parseActionItems } = require("./actionItems");
+const { createTask, isConfigured: pmConfigured } = require("./drifftPmClient");
 const { saveMeetingTitle, getMeetingTitle } = require("./supabaseClient");
 const { getMeetingTitleFromGoogle } = require("./googleCalendarClient");
 
@@ -118,6 +120,52 @@ async function advanceFollowUpBot(endedBotId) {
   console.log(`[followUp] Advanced "${followUp.next}" bot ${targetBotId} to ${joinAt.toISOString()}`);
 }
 
+/**
+ * Legt die Action Items einer Summary als Tasks in drifft PM an.
+ *
+ * Rein additiv: der Slack-Post ist zu diesem Zeitpunkt schon raus, und jeder
+ * Fehler hier bleibt folgenlos fuer ihn. Ohne API-Key passiert gar nichts,
+ * damit sich gefahrlos deployen laesst, bevor der Key existiert.
+ */
+async function createTasksFromSummary({ summary, meetingTitle, recordingId, sourceUrl }) {
+  if (!pmConfigured()) {
+    console.log("[pm] Kein DRIFFT_PM_API_KEY gesetzt - Task-Anlage uebersprungen.");
+    return;
+  }
+
+  const project = resolvePipeline(meetingTitle);
+  if (!project) {
+    console.warn(`[pm] Keine Pipeline fuer "${meetingTitle}" - keine Tasks angelegt.`);
+    return;
+  }
+
+  const items = parseActionItems(summary);
+  if (items.length === 0) {
+    console.log(`[pm] Keine Action Items in "${meetingTitle}".`);
+    return;
+  }
+
+  let created = 0;
+  for (const [i, item] of items.entries()) {
+    try {
+      await createTask({
+        project,
+        title: item.title,
+        assignee: item.assignee || undefined,
+        priority: item.priority,
+        source_url: sourceUrl || undefined,
+        // Stabil pro Aufnahme und Position: erneutes Verarbeiten desselben
+        // Transkripts erzeugt keine Duplikate.
+        external_ref: `summy:${recordingId}:${i}`,
+      });
+      created++;
+    } catch (err) {
+      console.error(`[pm] Task "${item.title}" fehlgeschlagen:`, err.message);
+      if (err.response?.data) console.error(JSON.stringify(err.response.data));
+    }
+  }
+  console.log(`[pm] ${created}/${items.length} Tasks angelegt (Pipeline ${project}).`);
+}
 async function handleWebhook(req, res) {
   const event = req.body;
   const eventType = event?.event;
@@ -219,8 +267,10 @@ async function handleWebhook(req, res) {
         return;
       }
 
-      await postSummary(channelId, meetingTitle, summary);
+      const permalink = await postSummary(channelId, meetingTitle, summary);
       console.log(`[webhook] Summary posted to Slack channel ${channelId}`);
+
+      await createTasksFromSummary({ summary, meetingTitle, recordingId, sourceUrl: permalink });
     } catch (err) {
       console.error(`[webhook] Error processing transcript ${transcriptId}:`, err.message);
       if (err.response?.data) console.error(JSON.stringify(err.response.data));

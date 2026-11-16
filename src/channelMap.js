@@ -104,4 +104,31 @@ function resolveChannel(meetingTitle = "") {
   return process.env.SLACK_CHANNEL_ID;
 }
 
-module.exports = { resolveChannel, resolveTitleFromSchedule, resolveFollowUp };
+/**
+ * Meeting-Titel -> Pipeline in drifft PM, adressiert ueber die Pipeline-ID.
+ * IDs statt Namen, weil die Namen Geviertstriche enthalten und umbenannt
+ * werden koennen - beides waere eine stille Fehlerquelle.
+ *
+ * P8 fehlt bewusst: unsere Config kennt "P8 - Paid Media", Gyuri nennt
+ * "Operations & Supply Chain". Bis das geklaert ist, lieber gar kein Task
+ * als einer im falschen Projekt.
+ */
+const PIPELINE_MAP = [
+  { keyword: "P12 - AI Automations",           project: "b4fdc545-a054-41ad-9f36-556144ba3df8" }, // 12 AI Automation
+  { keyword: "P1 - Brand and Design Systems",  project: "cdbe0024-fe76-40dd-976c-30c91d815a7f" }, // 01 Brand & Design System
+  { keyword: "P2 - Product and Packaging",     project: "318299e2-0239-446a-a2cf-6fb7d64ebe43" }, // 02 Product & Packaging
+  { keyword: "P3 - Digital Store & Tech Stack",project: "b1181911-3da6-4887-8be6-9a8f0454896a" }, // 03 Digital Store & Tech Stack
+  { keyword: "P4 - Data Analytics",            project: "8d528710-4c2c-471e-94c0-31d7977c7a58" }, // 04 Data, Analytics & Measurement
+  { keyword: "P5 - Email communication",       project: "1e9582e3-04b9-4778-ae03-d7978d3cbe1d" }, // 05 Shop - Email & Customer Communication
+  { keyword: "P6 - Content, Social & Audience",project: "7677d5d8-ef1b-4cff-83df-412f4866c51d" }, // Shop - Content & social
+  { keyword: "Dejan Garz",                     project: "a07e0635-b741-4b5d-92b2-18674ecfa69d" }, // Dejan Garz (clients)
+];
+
+function resolvePipeline(meetingTitle = "") {
+  const lower = meetingTitle.toLowerCase();
+  for (const { keyword, project } of PIPELINE_MAP) {
+    if (lower.includes(keyword.toLowerCase())) return project;
+  }
+  return null;
+}
+module.exports = { resolveChannel, resolveTitleFromSchedule, resolveFollowUp, resolvePipeline };

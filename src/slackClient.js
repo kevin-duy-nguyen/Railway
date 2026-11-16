@@ -21,11 +21,24 @@ async function postSummary(channelId, meetingTitle, summary) {
     ? `📋 *MEETING NOTES* — 🗓 ${meetingTitle} — 📅 ${date}`
     : `📋 *MEETING NOTES* — 📅 ${date}`;
 
-  await getClient().chat.postMessage({
+  const res = await getClient().chat.postMessage({
     channel: channelId,
     text: `${titleLine}\n\n${summary}`,
     mrkdwn: true,
   });
+
+  // Permalink dient den PM-Tasks als Quelle. Schlaegt er fehl, ist das kein
+  // Grund den bereits erfolgreichen Post als Fehler zu behandeln.
+  try {
+    const link = await getClient().chat.getPermalink({
+      channel: res.channel,
+      message_ts: res.ts,
+    });
+    return link.permalink || null;
+  } catch (err) {
+    console.warn("[slack] Permalink nicht ermittelbar:", err.message);
+    return null;
+  }
 }
 
 module.exports = { postSummary };
