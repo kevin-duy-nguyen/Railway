@@ -5,6 +5,7 @@ const { postSummary } = require("./slackClient");
 const { resolveChannel, resolveTitleFromSchedule, resolveFollowUp, resolvePipeline } = require("./channelMap");
 const { parseActionItems } = require("./actionItems");
 const { createTask, isConfigured: pmConfigured } = require("./drifftPmClient");
+const { classifyActionItems } = require("./pipelineClassifier");
 const { saveMeetingTitle, getMeetingTitle } = require("./supabaseClient");
 const { getMeetingTitleFromGoogle } = require("./googleCalendarClient");
 
@@ -133,20 +134,30 @@ async function createTasksFromSummary({ summary, meetingTitle, recordingId, sour
     return;
   }
 
-  const project = resolvePipeline(meetingTitle);
-  if (!project) {
-    console.warn(`[pm] Keine Pipeline fuer "${meetingTitle}" - keine Tasks angelegt.`);
-    return;
-  }
-
   const items = parseActionItems(summary);
   if (items.length === 0) {
     console.log(`[pm] Keine Action Items in "${meetingTitle}".`);
     return;
   }
 
+  // Calls mit festem Thema gehen komplett in ihre Pipeline. Uebergreifende
+  // Runden - Check-In, End of Week, die Marketing-Calls - haben keine, dort
+  // waehlt Claude pro Item. Ein Item ohne passende Pipeline wird ausgelassen,
+  // weil ein Task im falschen Projekt schlechter ist als keiner.
+  const fixed = resolvePipeline(meetingTitle);
+  const projects = fixed
+    ? items.map(() => fixed)
+    : await classifyActionItems(items, meetingTitle);
+
   let created = 0;
+  let skipped = 0;
   for (const [i, item] of items.entries()) {
+    const project = projects[i];
+    if (!project) {
+      skipped++;
+      console.log(`[pm] Keine Pipeline fuer "${item.title}" - uebersprungen.`);
+      continue;
+    }
     try {
       await createTask({
         project,
@@ -164,7 +175,7 @@ async function createTasksFromSummary({ summary, meetingTitle, recordingId, sour
       if (err.response?.data) console.error(JSON.stringify(err.response.data));
     }
   }
-  console.log(`[pm] ${created}/${items.length} Tasks angelegt (Pipeline ${project}).`);
+  console.log(`[pm] ${created}/${items.length} Tasks angelegt` + (skipped ? `, ${skipped} ohne Pipeline` : "") + ".");
 }
 async function handleWebhook(req, res) {
   const event = req.body;
