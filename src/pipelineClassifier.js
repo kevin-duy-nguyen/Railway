@@ -52,6 +52,7 @@ function buildSystemPrompt(pipelines) {
     "Rules:",
     "- Return ONLY a JSON array of strings, one entry per action item, in the same order.",
     "- Each entry is a pipeline id from the list above, or null if none fits.",
+    "- Pick the project the item belongs to, which is often NOT the meeting's own project.",
     "- Prefer null over a bad guess. A wrong project is worse than no task.",
     "- No prose, no explanation, no code fences.",
   ].join("\n");
@@ -99,14 +100,22 @@ async function classifyActionItems(items, meetingTitle = "") {
   }
   if (!text) return none;
 
-  let parsed;
+  const cleaned = text.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+  let parsed = null;
   try {
-    parsed = JSON.parse(text.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim());
+    parsed = JSON.parse(cleaned);
   } catch {
+    // Kommt die Antwort in Prosa verpackt, das erste Array herausschneiden.
+    const open = cleaned.indexOf("[");
+    const close = cleaned.lastIndexOf("]");
+    if (open !== -1 && close > open) {
+      try { parsed = JSON.parse(cleaned.slice(open, close + 1)); } catch { /* bleibt null */ }
+    }
+  }
+  if (!Array.isArray(parsed)) {
     console.error("[pm] Antwort der Klassifizierung ist kein JSON:", text.slice(0, 200));
     return none;
   }
-  if (!Array.isArray(parsed)) return none;
 
   const valid = new Set(pipelines.map((p) => p.id));
   return items.map((_, i) => (valid.has(parsed[i]) ? parsed[i] : null));

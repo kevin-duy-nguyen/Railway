@@ -31,10 +31,10 @@ const SCHEDULE = [
   // P2 steht im Kalender auf 9:30, das Team startet aber oft direkt nach dem
   // Check-In. Fenster beginnt daher schon 8:57 (nahtlos nach dem Check-In-
   // Fenster), damit ein vorgezogenes join_at weiterhin als P2 erkannt wird.
-  { day: 1, startH: 8, startM: 57, endH: 9,  endM: 47, title: "P2 - Product and Packaging" },
-  // "Marketing Week Kick-Off" (Mo 9:00) fehlt hier bewusst: sein Fenster laege
-  // mitten im vorgezogenen P2-Fenster. Zwei parallele Calls lassen sich ueber
-  // die Uhrzeit nicht auseinanderhalten.
+  // ambiguous: "Marketing Week Kick-Off" (Mo 9:00) laeuft parallel und steht
+  // deshalb nicht im Zeitplan. In diesem einen Fenster kann die Uhrzeit die
+  // beiden Calls nicht auseinanderhalten - nur hier ist der Titel unsicher.
+  { day: 1, startH: 8, startM: 57, endH: 9,  endM: 47, title: "P2 - Product and Packaging", ambiguous: true },
   { day: 2, startH: 8, startM: 28, endH: 8,  endM: 47, title: "P1 - Brand and Design Systems" },
   { day: 2, startH: 8, startM: 48, endH: 9,  endM: 7,  title: "P3 - Digital Store & Tech Stack" },
   { day: 3, startH: 8, startM: 28, endH: 8,  endM: 47, title: "P4 - Data Analytics" },
@@ -69,7 +69,7 @@ function resolveFollowUp(endedTitle = "") {
   return FOLLOW_UP.find((f) => lower.includes(f.after.toLowerCase())) || null;
 }
 
-function resolveTitleFromSchedule(joinAt) {
+function findScheduleSlot(joinAt) {
   // joinAt: ISO string z.B. "2026-05-27T06:48:00Z"
   try {
     const date = new Date(joinAt);
@@ -92,17 +92,32 @@ function resolveTitleFromSchedule(joinAt) {
     const m = Number(part("minute"));
     const totalMin = h * 60 + m;
 
-    const match = SCHEDULE.find(s => {
+    return SCHEDULE.find(s => {
       if (s.day !== day) return false;
       const start = s.startH * 60 + s.startM;
       const end = s.endH * 60 + s.endM; 
       return totalMin >= start && totalMin < end;
-    });
-
-    return match?.title || "";
+    }) || null;
   } catch {
-    return "";
+    return null;
   }
+}
+
+function resolveTitleFromSchedule(joinAt) {
+  return findScheduleSlot(joinAt)?.title || "";
+}
+
+/**
+ * Ist der aus dem Zeitplan abgeleitete Titel unsicher?
+ *
+ * Der Zeitplan ist der Normalfall, nicht die Ausnahme: Recall liefert in den
+ * Bot-Metadaten nichts, also kommt der Titel fast immer von hier. Ihm pauschal
+ * zu misstrauen hat am 17.11. dazu gefuehrt, dass P1 und P3 durch die
+ * Klassifizierung liefen statt in ihre feste Pipeline - P3 ganz ohne Tasks.
+ * Unsicher ist nur ein Fenster, in dem zwei Calls gleichzeitig laufen.
+ */
+function scheduleSlotIsAmbiguous(joinAt) {
+  return Boolean(findScheduleSlot(joinAt)?.ambiguous);
 }
 
 function resolveChannel(meetingTitle = "") {
@@ -154,4 +169,4 @@ function createsTasks(meetingTitle = "") {
   return !NO_TASKS.some((t) => lower.includes(t.toLowerCase()));
 }
 
-module.exports = { resolveChannel, resolveTitleFromSchedule, resolveFollowUp, resolvePipeline, createsTasks };
+module.exports = { resolveChannel, resolveTitleFromSchedule, scheduleSlotIsAmbiguous, resolveFollowUp, resolvePipeline, createsTasks };

@@ -2,7 +2,7 @@ const { createTranscript, getTranscriptDownloadUrl, downloadTranscript, getCalen
 const { formatTranscript } = require("./transcriptFormatter");
 const { summarizeTranscript } = require("./claudeClient");
 const { postSummary } = require("./slackClient");
-const { resolveChannel, resolveTitleFromSchedule, resolveFollowUp, resolvePipeline, createsTasks } = require("./channelMap");
+const { resolveChannel, resolveTitleFromSchedule, scheduleSlotIsAmbiguous, resolveFollowUp, resolvePipeline, createsTasks } = require("./channelMap");
 const { parseActionItems } = require("./actionItems");
 const { createTask, isConfigured: pmConfigured } = require("./drifftPmClient");
 const { classifyActionItems } = require("./pipelineClassifier");
@@ -41,9 +41,9 @@ function eventStart(e) {
 }
 
 /**
- * Liefert { title, guessed }. `guessed` ist true, wenn der Titel nur aus dem
- * Zeitplan abgeleitet wurde - also weder in den Bot-Metadaten noch in Supabase
- * stand. Ein so geratener Titel darf keine feste Pipeline setzen.
+ * Liefert { title, guessed }. `guessed` ist nur true, wenn der Titel aus einem
+ * mehrdeutigen Zeitplan-Fenster stammt - also montags 8:57-9:47, wo P2 und der
+ * Marketing-Kick-Off parallel laufen. Sonst ist der Zeitplan verlaesslich.
  */
 async function resolveMeetingTitle(botId, metadataName = "", prefetchedBot) {
   let title = metadataName || "";
@@ -56,7 +56,7 @@ async function resolveMeetingTitle(botId, metadataName = "", prefetchedBot) {
     if (joinAt) {
       title = resolveTitleFromSchedule(joinAt);
       console.log(`[webhook] Schedule title: "${title}"`);
-      if (title) return { title, guessed: true };
+      if (title) return { title, guessed: scheduleSlotIsAmbiguous(joinAt) };
     }
   }
   return { title, guessed: false };
@@ -150,21 +150,26 @@ async function createTasksFromSummary({ summary, meetingTitle, recordingId, sour
     return;
   }
 
-  // Calls mit festem Thema gehen komplett in ihre Pipeline. Die Marketing-Calls
-  // sind uebergreifend und haben keine, dort waehlt Claude pro Item. Ein Item
-  // ohne passende Pipeline wird ausgelassen, weil ein Task im falschen Projekt
-  // schlechter ist als keiner.
+  // Claude waehlt die Pipeline pro Item. Ein Thema aus dem P1-Call kann in ein
+  // ganz anderes Projekt gehoeren - der Task soll dort landen, wo er hingehoert,
+  // nicht pauschal im Projekt des Calls.
   //
-  // Ein nur geratener Titel bekommt ebenfalls keine feste Pipeline: montags
-  // ueberlappen Marketing-Kick-Off und das vorgezogene P2-Fenster, der Zeitplan
-  // allein kann die beiden nicht trennen.
+  // Die Pipeline des Calls ist der Rueckfall, wenn die Klassifizierung nichts
+  // liefert: ein Task im Projekt des Calls ist besser als gar keiner. Am 17.11.
+  // kam auf den P3-Call Prosa statt JSON zurueck und alle sieben Items fielen
+  // weg - genau das faengt der Rueckfall ab.
+  //
+  // Bei mehrdeutigem Titel (montags 8:57-9:47, P2 und Marketing-Kick-Off
+  // parallel) gibt es keinen Rueckfall: die Pipeline des Calls waere dann
+  // selbst geraten.
+  const fallback = titleGuessed ? null : resolvePipeline(meetingTitle);
   if (titleGuessed) {
-    console.log(`[pm] Titel "${meetingTitle}" nur aus dem Zeitplan geraten - Claude waehlt pro Item.`);
+    console.log(`[pm] Titel "${meetingTitle}" ist mehrdeutig - kein Rueckfall auf die Call-Pipeline.`);
   }
-  const fixed = titleGuessed ? null : resolvePipeline(meetingTitle);
-  const projects = fixed
-    ? items.map(() => fixed)
-    : await classifyActionItems(items, meetingTitle);
+  const classified = await classifyActionItems(items, meetingTitle);
+  const projects = items.map((_, i) => classified[i] || fallback);
+  const fellBack = projects.filter((p, i) => p && !classified[i]).length;
+  if (fellBack) console.log(`[pm] ${fellBack} Item(s) ohne Klassifizierung -> Pipeline des Calls.`);
 
   let created = 0;
   let skipped = 0;
