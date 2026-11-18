@@ -15,6 +15,54 @@ const { getAccessToken, isConfigured } = require("./googleAuth");
 const UPLOAD_URL =
   "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink";
 
+const FOLDER_MIME = "application/vnd.google-apps.folder";
+let cachedFolderId = null;
+
+/**
+ * Liefert den Ordner, in dem die Transkripte liegen.
+ *
+ * Ist GOOGLE_DRIVE_FOLDER_ID gesetzt, gilt die. Sonst legt Summy den Ordner
+ * selbst an - und das ist kein Komfort, sondern noetig: mit dem Scope
+ * drive.file sieht die App ausschliesslich Dateien, die sie selbst erzeugt
+ * hat. Ein von Hand angelegter Ordner waere fuer sie nicht auffindbar und
+ * Drive wuerde das parents-Feld mit "File not found" ablehnen.
+ *
+ * Nach einem Neustart findet die Suche den eigenen Ordner wieder, weil der
+ * Zugriff auf selbst angelegte Dateien bestehen bleibt.
+ */
+async function ensureFolderId(accessToken) {
+  const explicit = process.env.GOOGLE_DRIVE_FOLDER_ID;
+  if (explicit) return explicit;
+  if (cachedFolderId) return cachedFolderId;
+
+  const name = process.env.GOOGLE_DRIVE_FOLDER_NAME || "Summy Transkripte";
+  const auth = { Authorization: "Bearer " + accessToken };
+
+  const list = await axios.get("https://www.googleapis.com/drive/v3/files", {
+    headers: auth,
+    params: {
+      q: `mimeType='${FOLDER_MIME}' and name='${name.replace(/'/g, "\\'")}' and trashed=false`,
+      fields: "files(id,name)",
+      pageSize: 1,
+    },
+  });
+  const found = list.data?.files?.[0];
+  if (found) {
+    cachedFolderId = found.id;
+    return cachedFolderId;
+  }
+
+  const created = await axios.post(
+    "https://www.googleapis.com/drive/v3/files?fields=id,webViewLink",
+    { name, mimeType: FOLDER_MIME },
+    { headers: { ...auth, "Content-Type": "application/json" } }
+  );
+  cachedFolderId = created.data.id;
+  console.log(
+    `[docs] Ordner "${name}" neu angelegt (${cachedFolderId}). Einmal fuer das Team freigeben: ${created.data.webViewLink || "-"}`
+  );
+  return cachedFolderId;
+}
 function docName(meetingTitle, date) {
   // Datum zuerst, damit der Ordner sich von selbst chronologisch sortiert.
   const iso = new Intl.DateTimeFormat("en-CA", {
@@ -66,9 +114,14 @@ async function createTranscriptDoc({ meetingTitle = "", transcriptText = "", dat
       // hochgeladenen Text beim Anlegen in ein echtes Google Doc um.
       mimeType: "application/vnd.google-apps.document",
     };
-    // Ohne Ordner landet das Doc in "Meine Ablage" des autorisierten Kontos und
-    // sieht erstmal niemand sonst. Der Ordner regelt die Leserechte.
-    const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+    // Der Ordner regelt die Leserechte. Laesst er sich nicht ermitteln, wird
+    // das Doc trotzdem angelegt - lieber in "Meine Ablage" als gar nicht.
+    let folderId = null;
+    try {
+      folderId = await ensureFolderId(accessToken);
+    } catch (err) {
+      console.warn("[docs] Ordner nicht ermittelbar, lege ohne ab:", err.message);
+    }
     if (folderId) metadata.parents = [folderId];
 
     const boundary = "summy-" + Date.now();
@@ -102,4 +155,10 @@ async function createTranscriptDoc({ meetingTitle = "", transcriptText = "", dat
   }
 }
 
-module.exports = { createTranscriptDoc, docName };
+module.exports = {
+  createTranscriptDoc,
+  docName,
+  _resetFolderCache: () => {
+    cachedFolderId = null;
+  },
+};
