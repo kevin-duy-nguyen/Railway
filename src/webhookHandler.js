@@ -2,6 +2,7 @@ const { createTranscript, getTranscriptDownloadUrl, downloadTranscript, getCalen
 const { formatTranscript } = require("./transcriptFormatter");
 const { summarizeTranscript } = require("./claudeClient");
 const { postSummary } = require("./slackClient");
+const { createTranscriptDoc } = require("./googleDocsClient");
 const { resolveChannel, resolveTitleFromSchedule, scheduleSlotIsAmbiguous, resolveFollowUp, resolvePipeline, createsTasks } = require("./channelMap");
 const { parseActionItems } = require("./actionItems");
 const { createTask, isConfigured: pmConfigured } = require("./drifftPmClient");
@@ -300,10 +301,25 @@ async function handleWebhook(req, res) {
         return;
       }
 
-      const permalink = await postSummary(channelId, meetingTitle, summary);
+      // Das Doc entsteht vor dem Slack-Post, damit sein Link gleich mit in die
+      // Nachricht kann. Scheitert es, geht die Zusammenfassung ohne Link raus.
+      const transcriptUrl = await createTranscriptDoc({
+        meetingTitle,
+        transcriptText,
+      });
+
+      const permalink = await postSummary(channelId, meetingTitle, summary, transcriptUrl);
       console.log(`[webhook] Summary posted to Slack channel ${channelId}`);
 
-      await createTasksFromSummary({ summary, meetingTitle, recordingId, sourceUrl: permalink, titleGuessed });
+      // Als Quelle am Task steht das Transkript ueber dem Slack-Post: es zeigt
+      // den Wortlaut, nicht nur die Zusammenfassung.
+      await createTasksFromSummary({
+        summary,
+        meetingTitle,
+        recordingId,
+        sourceUrl: transcriptUrl || permalink,
+        titleGuessed,
+      });
     } catch (err) {
       console.error(`[webhook] Error processing transcript ${transcriptId}:`, err.message);
       if (err.response?.data) console.error(JSON.stringify(err.response.data));

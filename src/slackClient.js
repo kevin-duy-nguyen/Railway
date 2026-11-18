@@ -9,7 +9,7 @@ function getClient() {
   return _client;
 }
 
-async function postSummary(channelId, meetingTitle, summary) {
+async function postSummary(channelId, meetingTitle, summary, transcriptUrl = null) {
   const now = new Date();
   const date = now.toLocaleDateString("de-DE", {
     day: "2-digit",
@@ -21,9 +21,15 @@ async function postSummary(channelId, meetingTitle, summary) {
     ? `📋 *MEETING NOTES* — 🗓 ${meetingTitle} — 📅 ${date}`
     : `📋 *MEETING NOTES* — 📅 ${date}`;
 
+  // Der Link zum abgelegten Transkript haengt unten an. Recalls eigener
+  // Download-Link waere am naechsten Morgen schon abgelaufen.
+  const footer = transcriptUrl
+    ? `\n\n\u{1F4C4} <${transcriptUrl}|Vollstaendiges Transkript>`
+    : "";
+
   const res = await getClient().chat.postMessage({
     channel: channelId,
-    text: `${titleLine}\n\n${summary}`,
+    text: `${titleLine}\n\n${summary}${footer}`,
     mrkdwn: true,
   });
 
